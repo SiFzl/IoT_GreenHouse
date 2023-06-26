@@ -9,7 +9,7 @@
 #define DHTTYPE DHT22   
 DHT dht(DHTPIN, DHTTYPE); //// Initialize DHT sensor for normal 16mhz Arduino
 #define MQ2pin A3
-#define Threshold 400
+#define Threshold 150
 #define Threshold2 200
 #define Thresholdmin 700
 #define Thresholdmax 800
@@ -17,9 +17,12 @@ DHT dht(DHTPIN, DHTTYPE); //// Initialize DHT sensor for normal 16mhz Arduino
 //servo_motors
 Servo servo1;
 Servo servo2;
+int angle = 180;
 
 //Variables
-int LDRsensor = 0; //Stores light level
+int LDRsensor1 = 0; //Stores light level
+int LDRsensor2 = 0; //Stores light level
+int diffLDR = 0;
 float hum;  //Stores humidity value
 float temp; //Stores temperature value
 const int LMPin = A0; //Stores temperature value
@@ -45,16 +48,13 @@ void setup()
   dht.begin();
   pinMode(solenoidPin, OUTPUT);
   Serial.println("MQ2 warming up!");
-  servo1.write(0);
-  servo2.write(0);
+  servo1.write(angle);
+  servo2.write(angle);
 	delay(20000); // allow the MQ2 to warm up
 }
 
 void loop()
 {
-    
-    delay(2000);
-    
     //{MQ_2}
     MQValue = analogRead(MQ2pin);
 
@@ -63,12 +63,13 @@ void loop()
     soil_moisture = map(soil_moisture , Thresholdmin, Thresholdmax, 0, 100 );
 
     //{LDR}
-    LDRsensor = analogRead(A2);
+    LDRsensor1 = analogRead(A2);
+    LDRsensor2 = analogRead(A4);
     
     //{LM335}
     LMsensor = analogRead(A0);
-    voltageOut = (LMsensor * 5000) / 1024;
-    temperatureK = voltageOut / 10;
+    voltageOut = ((LMsensor * 5000) / 1024) ;
+    temperatureK = (voltageOut / 10) ;
     temperatureC = temperatureK - 273; 
     temperatureF = (temperatureC * 1.8) + 32;
 
@@ -79,6 +80,8 @@ void loop()
     //{LM335}
     Serial.print("Temperature(ºC): "); 
     Serial.print(temperatureC);  
+    Serial.print("voltage out): "); 
+    Serial.print(voltageOut);  
 
     //{DHT22}
     Serial.print("Humidity: ");
@@ -92,8 +95,13 @@ void loop()
     Serial.println(soil_moisture);
 
     //{LDR}
-    Serial.print("Light: ");
-    Serial.print(LDRsensor);
+    Serial.print("Light(sensor1): ");
+    Serial.print(LDRsensor1);
+    Serial.print("Light(sensor2): ");
+    Serial.print(LDRsensor2);
+    Serial.print("diff");
+    diffLDR = LDRsensor2 - LDRsensor1;
+    Serial.print(diffLDR);
 
     Serial.print("Smoke level: ");
     Serial.print(MQValue);
@@ -105,7 +113,7 @@ void loop()
   
     Serial.println("");
 
-    if(soil_moisture < 0)
+    if(soil_moisture < 25)
     {
       digitalWrite(solenoidPin, LOW);
       Serial.println("valve closed");
@@ -118,14 +126,32 @@ void loop()
     }
 
 
-    if(LDRsensor > Threshold2)
+    for(;diffLDR > 10 ; angle+=5)
     {
-      servo1.write(90);
-      servo2.write(90);
-      Serial.print(" | blinders closed!");
+      servo1.write(angle);
+      delay(15);
+      servo2.write(angle);
+      delay(15);
+      LDRsensor1 = analogRead(A2);
+      LDRsensor2 = analogRead(A4);
+      diffLDR = LDRsensor2 - LDRsensor1;
+      Serial.println("^");
+      
     }
 
-    delay(10000); //Delay 2 sec.
+    for(;diffLDR < -10 ; angle-=5)
+    {
+      servo1.write(angle);
+      delay(15);
+      servo2.write(angle);
+      delay(15);
+      LDRsensor1 = analogRead(A2);
+      LDRsensor2 = analogRead(A4);
+      diffLDR = LDRsensor2 - LDRsensor1;
+      Serial.println(".");
+    }
+
+    delay(5000); //Delay 2 sec.
 }
 
    
